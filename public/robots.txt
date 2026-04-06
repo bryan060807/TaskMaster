@@ -1,0 +1,11 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Protect private routes from being indexed
+Disallow: /protected
+Disallow: /auth/
+Disallow: /update-password
+Disallow: /logout
+
+Sitemap: https://your-taskmaster-domain.vercel.app/sitemap.xml

@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Env / secrets
+.env
+.env.*
+*.env
+
+# Build output
+dist/
+build/
+
+# Vite / React
+.vite/
+.react-router/
+
+# Logs
+*.log
+logs/
+
+# Editor / IDE
+.vs/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Misc
+.cache/
+.tmp/
+.codex/
