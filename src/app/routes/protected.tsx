@@ -28,6 +28,20 @@ import ListsView from '../../components/ListsView'
 import BrainDumpView from '../../components/BrainDumpView'
 import { Button } from '@/components/ui/button'
 
+function normalizeTask(task: any): Task {
+  return {
+    ...task,
+    userId: String(task.userId ?? task.user_id ?? ''),
+    categoryId: task.categoryId ?? task.category_id ?? 'general',
+    isCompleted: task.isCompleted ?? task.is_completed ?? false,
+    isFocus: task.isFocus ?? task.is_focus ?? false,
+    scheduledDate: task.scheduledDate ?? task.scheduled_date ?? null,
+    recurrenceId: task.recurrenceId ?? task.recurrence_id ?? null,
+    createdAt: task.createdAt ?? task.created_at,
+    updatedAt: task.updatedAt ?? task.updated_at,
+  }
+}
+
 export const clientLoader = async () => {
   const token = getToken()
 
@@ -36,7 +50,9 @@ export const clientLoader = async () => {
   }
 
   try {
-    const initialTasks = await db.getTasks()
+    const rawTasks = await db.getTasks()
+    const initialTasks = Array.isArray(rawTasks) ? rawTasks.map(normalizeTask) : []
+
     return {
       initialTasks,
       profile: { is_dark_mode: true },
@@ -52,7 +68,7 @@ export default function ProtectedPage() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
 
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [tasks, setTasks] = useState<Task[]>(Array.isArray(initialTasks) ? initialTasks : [])
   const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>([])
   const [lists, setLists] = useState<CustomList[]>([])
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -81,12 +97,14 @@ export default function ProtectedPage() {
     e.preventDefault()
     if (!newTaskTitle.trim()) return
 
-    const savedTask = await db.createTask({
-      title: newTaskTitle.trim(),
-      description: '',
-      priority: 'medium',
-      categoryId: selectedCategory,
-    })
+    const savedTask = normalizeTask(
+      await db.createTask({
+        title: newTaskTitle.trim(),
+        description: '',
+        priority: 'medium',
+        categoryId: selectedCategory,
+      })
+    )
 
     setTasks((prev) => [savedTask, ...prev])
     setNewTaskTitle('')
@@ -99,7 +117,12 @@ export default function ProtectedPage() {
     const newStatus = task.status === 'completed' ? 'pending' : 'completed'
 
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t)))
-    await db.updateTask(id, { status: newStatus })
+    const updatedTask = await db.updateTask(id, { status: newStatus })
+
+    if (updatedTask) {
+      const normalized = normalizeTask(updatedTask)
+      setTasks((prev) => prev.map((t) => (t.id === id ? normalized : t)))
+    }
   }
 
   const deleteTask = async (id: string) => {
@@ -110,7 +133,12 @@ export default function ProtectedPage() {
   const handlePromoteToToday = async (id: string) => {
     const today = new Date().toISOString().split('T')[0]
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, scheduledDate: today } : t)))
-    await db.updateTask(id, { scheduledDate: today } as Partial<Task>)
+
+    const updatedTask = await db.updateTask(id, { scheduledDate: today } as Partial<Task>)
+    if (updatedTask) {
+      const normalized = normalizeTask(updatedTask)
+      setTasks((prev) => prev.map((t) => (t.id === id ? normalized : t)))
+    }
   }
 
   const handleAIBreakdown = async (task: Task) => {
@@ -128,7 +156,7 @@ export default function ProtectedPage() {
           )
         )
         await db.deleteTask(task.id)
-        setTasks((prev) => [...subTasks, ...prev.filter((t) => t.id !== task.id)])
+        setTasks((prev) => [...subTasks.map(normalizeTask), ...prev.filter((t) => t.id !== task.id)])
       }
     } finally {
       setIsBreakingDown(null)
@@ -138,12 +166,18 @@ export default function ProtectedPage() {
   const todayStr = new Date().toISOString().split('T')[0]
   const focusTask = useMemo(() => tasks.find((t) => t.isFocus && t.status !== 'completed'), [tasks])
 
-  const todayTasks = useMemo(() =>
-    tasks.filter(
-      (t) => t.status !== 'completed' && !t.isFocus && t.scheduledDate && t.scheduledDate <= todayStr
-    ), [tasks, todayStr])
+  const todayTasks = useMemo(
+    () =>
+      tasks.filter(
+        (t) => t.status !== 'completed' && !t.isFocus && t.scheduledDate && t.scheduledDate <= todayStr
+      ),
+    [tasks, todayStr]
+  )
 
-  const brainDumpTasks = useMemo(() => tasks.filter((t) => t.status !== 'completed' && !t.scheduledDate), [tasks])
+  const brainDumpTasks = useMemo(
+    () => tasks.filter((t) => t.status !== 'completed' && !t.scheduledDate),
+    [tasks]
+  )
 
   const groupedBrainDump = useMemo(() => {
     const groups: Record<string, Task[]> = {}

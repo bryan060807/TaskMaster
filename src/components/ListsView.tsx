@@ -17,6 +17,71 @@ interface ListsViewProps {
   setLists: React.Dispatch<React.SetStateAction<CustomList[]>>;
 }
 
+function normalizeListItem(item: any): ListItem | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const id = item.id == null ? '' : String(item.id);
+  const textValue =
+    typeof item.text === 'string'
+      ? item.text
+      : typeof item.title === 'string'
+        ? item.title
+        : '';
+  const text = textValue.trim();
+
+  if (!id || !text) {
+    return null;
+  }
+
+  return {
+    id,
+    text,
+    isCompleted: item.isCompleted === true || item.is_completed === true,
+  };
+}
+
+function normalizeList(list: any): CustomList | null {
+  if (!list || typeof list !== 'object') {
+    return null;
+  }
+
+  const id = list.id == null ? '' : String(list.id);
+
+  if (!id) {
+    return null;
+  }
+
+  const items: ListItem[] = [];
+  const seenItemIds = new Set<string>();
+
+  if (Array.isArray(list.items)) {
+    for (const item of list.items) {
+      const normalizedItem = normalizeListItem(item);
+
+      if (!normalizedItem || seenItemIds.has(normalizedItem.id)) {
+        continue;
+      }
+
+      seenItemIds.add(normalizedItem.id);
+      items.push(normalizedItem);
+    }
+  }
+
+  return {
+    id,
+    user_id: String(list.userId ?? list.user_id ?? ''),
+    title: String(list.title ?? list.name ?? ''),
+    items,
+    createdAt: list.createdAt ?? list.created_at,
+  };
+}
+
+function isCustomList(list: CustomList | null): list is CustomList {
+  return list !== null;
+}
+
 export default function ListsView({ lists, setLists }: ListsViewProps) {
   const [newListTitle, setNewListTitle] = useState('');
   const [expandedListId, setExpandedListId] = useState<string | null>(null);
@@ -27,12 +92,9 @@ export default function ListsView({ lists, setLists }: ListsViewProps) {
       try {
         const data = await api.get('/lists');
 
-        const mapped: CustomList[] = (data || []).map((list: any) => ({
-          id: String(list.id),
-          title: list.name,
-          items: [],
-          createdAt: list.created_at,
-        }));
+        const mapped: CustomList[] = Array.isArray(data)
+          ? data.map(normalizeList).filter(isCustomList)
+          : [];
 
         setLists(mapped);
       } catch (err) {
@@ -52,12 +114,11 @@ export default function ListsView({ lists, setLists }: ListsViewProps) {
         name: newListTitle.trim(),
       });
 
-      const newList: CustomList = {
-        id: String(created.id),
-        title: created.name,
-        items: [],
-        createdAt: created.created_at,
-      };
+      const newList = normalizeList(created);
+
+      if (!newList) {
+        throw new Error('Invalid list response');
+      }
 
       setLists((prev) => [newList, ...prev]);
       setNewListTitle('');
@@ -85,57 +146,85 @@ export default function ListsView({ lists, setLists }: ListsViewProps) {
     const text = newItemTexts[listId]?.trim();
     if (!text) return;
 
-    const newItem: ListItem = {
-      id: crypto.randomUUID(),
-      text,
-      isCompleted: false,
-    };
+    try {
+      const updated = await api.post(`/lists/${listId}/items`, { text });
+      const updatedList = normalizeList(updated);
 
-    setLists((prev) =>
-      prev.map((list) => {
-        if (list.id === listId) {
-          return {
-            ...list,
-            items: [...list.items, newItem],
-          };
-        }
-        return list;
-      })
-    );
+      if (!updatedList) {
+        throw new Error('Invalid list response');
+      }
 
-    setNewItemTexts((prev) => ({ ...prev, [listId]: '' }));
+      setLists((prev) =>
+        prev.map((list) =>
+          list.id === listId
+            ? {
+                ...list,
+                ...updatedList,
+              }
+            : list
+        )
+      );
+
+      setNewItemTexts((prev) => ({ ...prev, [listId]: '' }));
+    } catch (err) {
+      console.error('Failed to add list item:', err);
+    }
   };
 
   const toggleItem = async (listId: string, itemId: string) => {
-    setLists((prev) =>
-      prev.map((list) => {
-        if (list.id === listId) {
-          return {
-            ...list,
-            items: list.items.map((item) =>
-              item.id === itemId
-                ? { ...item, isCompleted: !item.isCompleted }
-                : item
-            ),
-          };
-        }
-        return list;
-      })
-    );
+    const item = lists
+      .find((list) => list.id === listId)
+      ?.items.find((listItem) => listItem.id === itemId);
+
+    if (!item) return;
+
+    try {
+      const updated = await api.put(`/lists/${listId}/items/${itemId}`, {
+        isCompleted: !item.isCompleted,
+      });
+      const updatedList = normalizeList(updated);
+
+      if (!updatedList) {
+        throw new Error('Invalid list response');
+      }
+
+      setLists((prev) =>
+        prev.map((list) =>
+          list.id === listId
+            ? {
+                ...list,
+                ...updatedList,
+              }
+            : list
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update list item:', err);
+    }
   };
 
   const deleteItem = async (listId: string, itemId: string) => {
-    setLists((prev) =>
-      prev.map((list) => {
-        if (list.id === listId) {
-          return {
-            ...list,
-            items: list.items.filter((item) => item.id !== itemId),
-          };
-        }
-        return list;
-      })
-    );
+    try {
+      const updated = await api.delete(`/lists/${listId}/items/${itemId}`);
+      const updatedList = normalizeList(updated);
+
+      if (!updatedList) {
+        throw new Error('Invalid list response');
+      }
+
+      setLists((prev) =>
+        prev.map((list) =>
+          list.id === listId
+            ? {
+                ...list,
+                ...updatedList,
+              }
+            : list
+        )
+      );
+    } catch (err) {
+      console.error('Failed to delete list item:', err);
+    }
   };
 
   return (

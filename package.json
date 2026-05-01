@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "react-router dev --port=3000 --host=0.0.0.0",
+    "dev": "react-router dev --port=3100 --host=0.0.0.0",
     "build": "react-router build",
     "preview": "vite preview",
     "clean": "if exist build rmdir /s /q build && if exist dist rmdir /s /q dist && if exist .react-router rmdir /s /q .react-router",
@@ -41,6 +41,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "serve": "^14.2.6",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2"

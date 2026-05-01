@@ -19,7 +19,18 @@ async function request(path, options = {}) {
     ...options,
   });
 
-  return res.json();
+  if (res.status === 204) {
+    return null;
+  }
+
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!res.ok) {
+    throw new Error(data?.error || `Request failed: ${res.status}`);
+  }
+
+  return data;
 }
 
 export const db = {
