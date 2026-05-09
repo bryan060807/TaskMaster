@@ -378,7 +378,7 @@ export default function ProtectedPage() {
                 Brain Dump
               </h2>
               <div className="space-y-4">
-                {Object.entries(groupedBrainDump).map(([category, categoryTasks]) => {
+                {(Object.entries(groupedBrainDump) as [string, Task[]][]).map(([category, categoryTasks]) => {
                   const categoryDefinition = CATEGORIES[category as Category] || CATEGORIES.general
 
                   return (

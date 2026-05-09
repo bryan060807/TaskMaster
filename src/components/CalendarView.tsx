@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -14,23 +14,23 @@ interface CalendarViewProps {
   setRecurringTasks: React.Dispatch<React.SetStateAction<RecurringTask[]>>;
 }
 
-const SortableTaskItem = ({
+function SortableTaskItem({
   task,
   onToggle,
   onDelete,
 }: {
-  task: Task;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-}) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  task: Task
+  onToggle: (id: string) => void | Promise<void>
+  onDelete: (id: string) => void | Promise<void>
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-  };
+  }
 
-  const category = CATEGORIES[task.categoryId || 'general'] || CATEGORIES.general;
+  const category = CATEGORIES[task.categoryId || 'general'] || CATEGORIES.general
 
   return (
     <div
@@ -73,11 +73,11 @@ const SortableTaskItem = ({
         <Trash2 className="w-3 h-3" />
       </button>
     </div>
-  );
-};
+  )
+}
 
-const DroppableColumn = ({ id, children, day }: { id: string; children: React.ReactNode; day: Date }) => {
-  const { isOver, setNodeRef } = useDroppable({ id });
+function DroppableColumn({ id, children, day }: { id: string; children: React.ReactNode; day: Date }) {
+  const { isOver, setNodeRef } = useDroppable({ id })
 
   return (
     <div
@@ -94,8 +94,8 @@ const DroppableColumn = ({ id, children, day }: { id: string; children: React.Re
       </div>
       {children}
     </div>
-  );
-};
+  )
+}
 
 export default function CalendarView({ tasks, setTasks, recurringTasks, setRecurringTasks }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -270,13 +270,17 @@ export default function CalendarView({ tasks, setTasks, recurringTasks, setRecur
             const dayTasks = tasks.filter((t) => t.scheduledDate === dayId);
 
             return (
-              <DroppableColumn key={dayId} id={dayId} day={day}>
-                <SortableContext items={dayTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                  {dayTasks.map((task) => (
-                    <SortableTaskItem key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} />
-                  ))}
-                </SortableContext>
-              </DroppableColumn>
+              <div key={dayId}>
+                <DroppableColumn id={dayId} day={day}>
+                  <SortableContext items={dayTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                    {dayTasks.map((task) => (
+                      <React.Fragment key={task.id}>
+                        <SortableTaskItem task={task} onToggle={toggleTask} onDelete={deleteTask} />
+                      </React.Fragment>
+                    ))}
+                  </SortableContext>
+                </DroppableColumn>
+              </div>
             );
           })}
         </div>

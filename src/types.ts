@@ -10,8 +10,10 @@ export interface Task {
   isCompleted: boolean;
   createdAt: number | string; // Supabase returns ISO strings
   isFocus: boolean;
-  scheduledDate?: string; // Format: YYYY-MM-DD
-  recurrenceId?: string; // Links to a RecurringTask ID
+  scheduledDate?: string | null; // Format: YYYY-MM-DD
+  recurrenceId?: string | null; // Links to a RecurringTask ID
+  priority?: string;
+  status?: 'pending' | 'completed';
 }
 
 export interface RecurringTask {
